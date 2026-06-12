@@ -163,12 +163,25 @@ export const tick = internalAction({
       /(^|\n)\s*\d+[.)]\s/.test(t) || // numbered list
       /^(let me|here'?s|here is|okay[,.]|sure[,.]|first[,. ]|to break|breakdown|step\s*\d|i'?ll (break|start|go))/i.test(t);
     if (looksLikeDump) return { posted: false };
-    const clean = t
+    const normalised = t
       .replace(/\s*\n+\s*/g, " ") // collapse any stray line breaks into one line
       .replace(/^["']|["']$/g, "")
       .replace(/^[A-Za-z]+:\s*/, "")
-      .trim()
-      .slice(0, 280);
+      .trim();
+    // Keep it punchy without chopping mid-word: if it runs long, trim back to the last complete
+    // sentence inside the cap; failing that, to the last whole word with an ellipsis.
+    const MAX = 360;
+    let clean = normalised;
+    if (clean.length > MAX) {
+      const cut = clean.slice(0, MAX);
+      const sentenceEnd = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+      if (sentenceEnd > MAX * 0.5) {
+        clean = cut.slice(0, sentenceEnd + 1).trim();
+      } else {
+        const lastSpace = cut.lastIndexOf(" ");
+        clean = (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trim() + "…";
+      }
+    }
     if (clean.length < 8) return { posted: false };
     await ctx.runMutation(internal.banter.post, { modelId: speaker.id, content: clean });
     return { posted: true };
