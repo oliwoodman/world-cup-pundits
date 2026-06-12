@@ -21,7 +21,7 @@ type PredRow = {
 };
 type BetRow = { _id: string; stake: number; selection: string; odds: number; model: SlimModel };
 type MsgRow = { _id: string; round: number; content: string; model: SlimModel };
-type Star = { player: string; sign: string };
+type Star = { player: string; sign: string; url?: string };
 type Dossier = {
   homeRank?: number;
   awayRank?: number;
@@ -30,16 +30,38 @@ type Dossier = {
   homeStar?: Star;
   awayStar?: Star;
   weather?: string;
-  news: { team: string; headline: string; source?: string }[];
+  news: { team: string; headline: string; source?: string; url?: string }[];
   funFact?: string;
 } | null;
 
-function DossierRow({ label, source, children }: { label: string; source: string; children: React.ReactNode }) {
+function DossierRow({
+  label,
+  source,
+  sourceHref,
+  children,
+}: {
+  label: string;
+  source: string;
+  sourceHref?: string;
+  children: React.ReactNode;
+}) {
+  const sourceClass = "shrink-0 font-mono text-[10px] uppercase tracking-wider text-faint/70";
   return (
     <div className="flex items-start gap-3 border-b border-line/60 py-3 text-[13px]">
       <span className="kicker w-20 shrink-0 pt-0.5 text-faint">{label}</span>
       <div className="min-w-0 flex-1">{children}</div>
-      <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-faint/70">{source}</span>
+      {sourceHref ? (
+        <a
+          href={sourceHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${sourceClass} underline decoration-line underline-offset-2 transition-colors hover:text-foreground`}
+        >
+          {source} ↗
+        </a>
+      ) : (
+        <span className={sourceClass}>{source}</span>
+      )}
     </div>
   );
 }
@@ -127,7 +149,7 @@ export default function MatchPage() {
             </div>
             <div className="border-t border-line/60">
               {(dossier.homeRank || dossier.awayRank) && (
-                <DossierRow label="FIFA rank" source="FIFA">
+                <DossierRow label="FIFA rank" source="FIFA" sourceHref="https://inside.fifa.com/fifa-world-ranking/men">
                   <span className="font-serif">{fixture.homeTeam}</span>{" "}
                   <span className="font-mono text-muted">#{dossier.homeRank ?? "?"}</span>
                   <span className="text-faint"> · </span>
@@ -136,11 +158,23 @@ export default function MatchPage() {
                 </DossierRow>
               )}
               {(dossier.homeStar || dossier.awayStar) && (
-                <DossierRow label="Talismen" source="TheSportsDB">
+                <DossierRow label="Talismen" source="TheSportsDB" sourceHref="https://www.thesportsdb.com">
                   {[dossier.homeStar, dossier.awayStar].filter(Boolean).map((s, i) => (
                     <span key={i}>
                       {i > 0 && <span className="text-faint"> · </span>}
-                      {s!.player} <span className="text-muted">({s!.sign})</span>
+                      {s!.url ? (
+                        <a
+                          href={s!.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline decoration-line underline-offset-2 transition-colors hover:text-accent"
+                        >
+                          {s!.player}
+                        </a>
+                      ) : (
+                        s!.player
+                      )}{" "}
+                      <span className="text-muted">({s!.sign})</span>
                     </span>
                   ))}
                 </DossierRow>
@@ -155,17 +189,28 @@ export default function MatchPage() {
                 </DossierRow>
               )}
               {dossier.weather && (
-                <DossierRow label="Weather" source="Open-Meteo">
+                <DossierRow label="Weather" source="Open-Meteo" sourceHref="https://open-meteo.com">
                   <span className="font-serif">{dossier.weather}</span>
                 </DossierRow>
               )}
               {dossier.news.length > 0 && (
-                <DossierRow label="On the wire" source="GNews">
+                <DossierRow label="On the wire" source="GNews" sourceHref="https://gnews.io">
                   <ul className="space-y-1.5">
                     {dossier.news.map((n, i) => (
                       <li key={i} className="flex gap-2">
                         <span className="kicker mt-0.5 shrink-0 !tracking-[0.1em] text-faint">{codeFor(n.team)}</span>
-                        <span className="text-foreground/90">{n.headline}</span>
+                        {n.url ? (
+                          <a
+                            href={n.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-foreground/90 underline decoration-line underline-offset-2 transition-colors hover:text-accent"
+                          >
+                            {n.headline}
+                          </a>
+                        ) : (
+                          <span className="text-foreground/90">{n.headline}</span>
+                        )}
                       </li>
                     ))}
                   </ul>

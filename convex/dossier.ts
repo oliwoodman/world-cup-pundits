@@ -65,8 +65,9 @@ function funFactFor(home: string, away: string): string {
   return `Astro corner (for fun): it's ${SIGNS[h % SIGNS.length]} season and ${OMENS[(h >> 4) % OMENS.length]}`;
 }
 
-// Headlines via the GNews API (falls back to nothing if the key/quota is unavailable).
-async function fetchTeamNews(team: string): Promise<string[]> {
+// Headlines via the GNews API (falls back to nothing if the key/quota is unavailable). We keep each
+// article's URL so readers can click through and check the source.
+async function fetchTeamNews(team: string): Promise<{ headline: string; url?: string }[]> {
   const key = process.env.GNEWS_API_KEY;
   if (!key) return [];
   try {
@@ -75,14 +76,18 @@ async function fetchTeamNews(team: string): Promise<string[]> {
     );
     if (!res.ok) return [];
     const j = await res.json();
-    return (j.articles ?? []).map((a: { title?: string }) => a.title).filter(Boolean).slice(0, 2);
+    return (j.articles ?? [])
+      .map((a: { title?: string; url?: string }) => ({ headline: a.title, url: a.url }))
+      .filter((a: { headline?: string }) => a.headline)
+      .slice(0, 2);
   } catch {
     return [];
   }
 }
 
-// Talisman + star sign via TheSportsDB.
-async function fetchStar(team: string): Promise<{ player: string; sign: string } | null> {
+// Talisman + star sign via TheSportsDB. We keep the player's TheSportsDB page so the birthday (and
+// therefore the star sign) can be verified.
+async function fetchStar(team: string): Promise<{ player: string; sign: string; url?: string } | null> {
   const key = process.env.THESPORTSDB_KEY;
   const player = TALISMAN[team];
   if (!key || !player) return null;
@@ -96,7 +101,11 @@ async function fetchStar(team: string): Promise<{ player: string; sign: string }
     if (!p?.dateBorn) return null;
     const [, mm, dd] = String(p.dateBorn).split("-").map(Number);
     if (!mm || !dd) return null;
-    return { player: p.strPlayer ?? player, sign: starSign(mm, dd) };
+    return {
+      player: p.strPlayer ?? player,
+      sign: starSign(mm, dd),
+      url: p.idPlayer ? `https://www.thesportsdb.com/player/${p.idPlayer}` : undefined,
+    };
   } catch {
     return null;
   }
@@ -132,9 +141,9 @@ export const saveDossier = internalMutation({
     awayRank: v.optional(v.number()),
     homeForm: v.optional(v.string()),
     awayForm: v.optional(v.string()),
-    homeStar: v.optional(v.object({ player: v.string(), sign: v.string() })),
-    awayStar: v.optional(v.object({ player: v.string(), sign: v.string() })),
-    news: v.array(v.object({ team: v.string(), headline: v.string(), source: v.optional(v.string()) })),
+    homeStar: v.optional(v.object({ player: v.string(), sign: v.string(), url: v.optional(v.string()) })),
+    awayStar: v.optional(v.object({ player: v.string(), sign: v.string(), url: v.optional(v.string()) })),
+    news: v.array(v.object({ team: v.string(), headline: v.string(), source: v.optional(v.string()), url: v.optional(v.string()) })),
     funFact: v.optional(v.string()),
   },
   handler: async (ctx, a) => {
@@ -154,8 +163,8 @@ export const assembleForFixture = internalAction({
     const awayNews = await fetchTeamNews(fx.awayTeam);
     const [homeStar, awayStar] = await Promise.all([fetchStar(fx.homeTeam), fetchStar(fx.awayTeam)]);
     const news = [
-      ...homeNews.map((h) => ({ team: fx.homeTeam, headline: h, source: "GNews" })),
-      ...awayNews.map((h) => ({ team: fx.awayTeam, headline: h, source: "GNews" })),
+      ...homeNews.map((h) => ({ team: fx.homeTeam, headline: h.headline, source: "GNews", url: h.url })),
+      ...awayNews.map((h) => ({ team: fx.awayTeam, headline: h.headline, source: "GNews", url: h.url })),
     ];
     await ctx.runMutation(internal.dossier.saveDossier, {
       fixtureId,

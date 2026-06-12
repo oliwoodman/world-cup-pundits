@@ -17,12 +17,12 @@ type Pundit = {
 };
 
 const SOURCES = [
-  { label: "Real bookmaker odds", detail: "match & tournament-winner prices", src: "The Odds API" },
+  { label: "Real bookmaker odds", detail: "match & tournament-winner prices", src: "The Odds API", href: "https://the-odds-api.com" },
   { label: "Form", detail: "each side's last five results", src: "Computed from results" },
   { label: "The money race", detail: "every pundit's live bankroll & rank", src: "Internal ledger" },
-  { label: "FIFA world ranking", detail: "the tale of the tape", src: "FIFA" },
-  { label: "Latest headlines", detail: "injuries, form, drama on the wire", src: "GNews" },
-  { label: "Talisman star signs", detail: "each side's danger man, born under…", src: "TheSportsDB" },
+  { label: "FIFA world ranking", detail: "the tale of the tape", src: "FIFA", href: "https://inside.fifa.com/fifa-world-ranking/men" },
+  { label: "Latest headlines", detail: "injuries, form, drama on the wire", src: "GNews", href: "https://gnews.io" },
+  { label: "Talisman star signs", detail: "each side's danger man, born under…", src: "TheSportsDB", href: "https://www.thesportsdb.com" },
   { label: "A cosmic angle", detail: "purely for the pundits to seize or mock", src: "For fun" },
 ];
 
@@ -125,7 +125,18 @@ export default function AboutPage() {
                 <span className="font-serif text-[15px]">{s.label}</span>
                 <span className="text-faint"> — {s.detail}</span>
               </div>
-              <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-faint/70">{s.src}</span>
+              {s.href ? (
+                <a
+                  href={s.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-faint/70 underline decoration-line underline-offset-2 transition-colors hover:text-foreground"
+                >
+                  {s.src} ↗
+                </a>
+              ) : (
+                <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-faint/70">{s.src}</span>
+              )}
             </div>
           ))}
         </div>

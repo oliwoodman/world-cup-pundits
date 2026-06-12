@@ -61,11 +61,11 @@ export default defineSchema({
         awayRank: v.optional(v.number()),
         homeForm: v.optional(v.string()), // last-5 W/D/L from our own results, e.g. "WWDLW"
         awayForm: v.optional(v.string()),
-        homeStar: v.optional(v.object({ player: v.string(), sign: v.string() })), // TheSportsDB talisman
-        awayStar: v.optional(v.object({ player: v.string(), sign: v.string() })),
+        homeStar: v.optional(v.object({ player: v.string(), sign: v.string(), url: v.optional(v.string()) })), // TheSportsDB talisman
+        awayStar: v.optional(v.object({ player: v.string(), sign: v.string(), url: v.optional(v.string()) })),
         weather: v.optional(v.string()),
         news: v.array(
-          v.object({ team: v.string(), headline: v.string(), source: v.optional(v.string()) }),
+          v.object({ team: v.string(), headline: v.string(), source: v.optional(v.string()), url: v.optional(v.string()) }),
         ),
         funFact: v.optional(v.string()),
         builtAt: v.number(),
