@@ -95,10 +95,10 @@ export const context = internalQuery({
       ? `${upcoming.homeTeam} v ${upcoming.awayTeam} (kickoff in ~${Math.max(1, Math.round((upcoming.kickoffAt - now) / 3_600_000))}h)`
       : null;
 
-    const recentDesc = await ctx.db.query("banter").order("desc").take(10);
+    const recentDesc = await ctx.db.query("banter").order("desc").take(60);
     const nameById = new Map(models.map((m) => [m._id, m.displayName]));
     const lastSpeakerId = recentDesc[0]?.modelId ?? null;
-    const recentChat = [...recentDesc].reverse().map((r) => ({ name: nameById.get(r.modelId) ?? "?", content: r.content }));
+    const recentChat = [...recentDesc].reverse().map((r) => ({ modelId: r.modelId, name: nameById.get(r.modelId) ?? "?", content: r.content }));
 
     const draw = tournamentGroundingText(fixtures.filter((f) => f.externalId));
     const stateText = await stateOfPlay(ctx.db);
@@ -121,6 +121,8 @@ export const tick = internalAction({
     const me = c.models.find((m) => m.id === speaker.id)!;
     const myPick = me.backing ? `you backed ${me.backing} to win the Cup for £${Math.round(me.backingStake)}` : "you have NOT placed a tournament-winner bet";
     const chat = c.recent.length ? c.recent.map((r) => `${r.name}: ${r.content}`).join("\n") : "(the chat is quiet so far)";
+    const mine = c.recent.filter((r) => r.modelId === speaker.id).map((r) => r.content);
+    const myLines = mine.length ? mine.slice(-10).map((t) => `• ${t}`).join("\n") : "(you haven't spoken yet)";
 
     const sys =
       `You are ${speaker.name}, one of five AI football pundits in a running group chat during World Cup ` +
@@ -128,7 +130,9 @@ export const tick = internalAction({
       `${speaker.mood}. Stay ferociously in character, be funny, roast the others BY NAME. Reply with ONE punchy ` +
       `line only (max 2 short sentences). No markdown, no surrounding quotes, no "Name:" prefix. ` +
       `CRITICAL: only reference the REAL facts you are given — never invent a bet, result, score or fixture, and ` +
-      `NEVER claim a team listed in the draw "isn't in the tournament" or "didn't qualify". Every listed team is in.`;
+      `NEVER claim a team listed in the draw "isn't in the tournament" or "didn't qualify". Every listed team is in. ` +
+      `Do NOT repeat a joke, insult or point you've already made — look at YOUR OWN RECENT LINES below and say ` +
+      `something genuinely NEW; move the conversation forward and react to the latest messages.`;
     const user =
       `THE REAL STATE — these are facts, do not contradict or invent beyond them:\n\n` +
       (c.draw ? `${c.draw}\n\n` : "") +
@@ -136,10 +140,11 @@ export const tick = internalAction({
       `YOU are ${speaker.name}: £${Math.round(me.bankroll)} (rank ${me.rank}/5); ${myPick}.\n` +
       `Results so far: ${c.results}\n` +
       (c.nextMatch ? `Next match up: ${c.nextMatch}\n` : "No match kicking off imminently.\n") +
-      `\nTHE GROUP CHAT so far:\n${chat}\n\n` +
-      `Drop your next message: react to one of the REAL facts above (a real bet, a real result, the standings) ` +
-      `or to what someone just said — name them. Short and spiky. Do NOT make up bets, scores or games, and do ` +
-      `not deny any real team or fixture.`;
+      `\nTHE GROUP CHAT so far (oldest first, newest last):\n${chat}\n\n` +
+      `YOUR OWN RECENT LINES — do NOT repeat these, find a fresh angle:\n${myLines}\n\n` +
+      `Drop your next message: react to the LATEST lines or a REAL fact above (a real bet, a real result, the ` +
+      `standings, the next match) — name names. Short and spiky, and DIFFERENT from anything you've already said. ` +
+      `Do NOT make up bets, scores or games, and do not deny any real team or fixture.`;
 
     const text = await callModel(speaker.slug, [
       { role: "system", content: sys },
