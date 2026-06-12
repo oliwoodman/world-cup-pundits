@@ -155,8 +155,21 @@ export const tick = internalAction({
       { role: "user", content: user },
     ]);
     if (!text) return { posted: false };
-    const clean = text.replace(/^["']|["']$/g, "").replace(/^[A-Za-z]+:\s*/, "").trim().slice(0, 280);
-    if (!clean) return { posted: false };
+    // Reject planning/scratchpad dumps — a Touchline line is ONE punchy line, never a list or a
+    // "let me break this down" preamble. Better to post nothing and let the next tick try again.
+    const t = text.trim();
+    const looksLikeDump =
+      /(^|\n)\s*[-*•]\s/.test(t) || // bullet list
+      /(^|\n)\s*\d+[.)]\s/.test(t) || // numbered list
+      /^(let me|here'?s|here is|okay[,.]|sure[,.]|first[,. ]|to break|breakdown|step\s*\d|i'?ll (break|start|go))/i.test(t);
+    if (looksLikeDump) return { posted: false };
+    const clean = t
+      .replace(/\s*\n+\s*/g, " ") // collapse any stray line breaks into one line
+      .replace(/^["']|["']$/g, "")
+      .replace(/^[A-Za-z]+:\s*/, "")
+      .trim()
+      .slice(0, 280);
+    if (clean.length < 8) return { posted: false };
     await ctx.runMutation(internal.banter.post, { modelId: speaker.id, content: clean });
     return { posted: true };
   },
