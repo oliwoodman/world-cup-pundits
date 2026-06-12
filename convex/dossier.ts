@@ -111,6 +111,106 @@ async function fetchStar(team: string): Promise<{ player: string; sign: string; 
   }
 }
 
+// ---- Weather (Open-Meteo, keyless) ----------------------------------------
+// The 16 host stadiums → coordinates. Keyed by a distinctive lowercase substring of the venue name
+// as TheSportsDB writes it (e.g. Houston's NRG Stadium is listed under its old name "Reliant").
+const VENUE_COORDS: { key: string; lat: number; lon: number }[] = [
+  { key: "azteca", lat: 19.3029, lon: -99.1505 }, // Estadio Azteca, Mexico City
+  { key: "akron", lat: 20.6818, lon: -103.4625 }, // Estadio Akron, Guadalajara
+  { key: "bbva", lat: 25.6692, lon: -100.2444 }, // Estadio BBVA, Monterrey
+  { key: "bmo", lat: 43.6332, lon: -79.4185 }, // BMO Field, Toronto
+  { key: "bc place", lat: 49.2768, lon: -123.1119 }, // BC Place, Vancouver
+  { key: "mercedes", lat: 33.7553, lon: -84.4006 }, // Mercedes-Benz Stadium, Atlanta
+  { key: "gillette", lat: 42.0909, lon: -71.2643 }, // Gillette Stadium, Boston
+  { key: "at&t", lat: 32.7473, lon: -97.0945 }, // AT&T Stadium, Dallas
+  { key: "nrg", lat: 29.6847, lon: -95.4107 }, // NRG Stadium, Houston
+  { key: "reliant", lat: 29.6847, lon: -95.4107 }, // (TheSportsDB's old name for NRG)
+  { key: "arrowhead", lat: 39.0489, lon: -94.4839 }, // Arrowhead Stadium, Kansas City
+  { key: "sofi", lat: 33.9535, lon: -118.3392 }, // SoFi Stadium, Los Angeles
+  { key: "hard rock", lat: 25.958, lon: -80.2389 }, // Hard Rock Stadium, Miami
+  { key: "metlife", lat: 40.8128, lon: -74.0742 }, // MetLife Stadium, New York/NJ
+  { key: "lincoln financial", lat: 39.9008, lon: -75.1675 }, // Lincoln Financial Field, Philadelphia
+  { key: "levi", lat: 37.403, lon: -121.9698 }, // Levi's Stadium, SF Bay Area
+  { key: "lumen", lat: 47.5952, lon: -122.3316 }, // Lumen Field, Seattle
+];
+
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+// WMO weather code → short description (https://open-meteo.com/en/docs).
+function describeCode(code: number): string {
+  if (code === 0) return "clear skies";
+  if (code <= 2) return "partly cloudy";
+  if (code === 3) return "overcast";
+  if (code <= 48) return "foggy";
+  if (code <= 57) return "drizzle";
+  if (code <= 67) return "rain";
+  if (code <= 77) return "snow";
+  if (code <= 82) return "rain showers";
+  if (code <= 86) return "snow showers";
+  return "thunderstorms";
+}
+
+// Find the fixture's stadium on TheSportsDB (real venue), map it to coordinates.
+async function fetchVenueCoords(home: string, away: string): Promise<{ lat: number; lon: number } | null> {
+  const key = process.env.THESPORTSDB_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch(`https://www.thesportsdb.com/api/v1/json/${key}/eventsseason.php?id=4429&s=2026`);
+    if (!res.ok) return null;
+    const j = await res.json();
+    const events: { strHomeTeam?: string; strAwayTeam?: string; strVenue?: string }[] = j.events ?? [];
+    const want = new Set([norm(home), norm(away)]);
+    const ev = events.find((e) => {
+      const h = norm(e.strHomeTeam ?? "");
+      const a = norm(e.strAwayTeam ?? "");
+      return want.has(h) && want.has(a) && h !== a;
+    });
+    if (!ev?.strVenue) return null;
+    const v = ev.strVenue.toLowerCase();
+    const hit = VENUE_COORDS.find((c) => v.includes(c.key));
+    return hit ? { lat: hit.lat, lon: hit.lon } : null;
+  } catch {
+    return null;
+  }
+}
+
+// Open-Meteo forecast for kickoff (keyless). Returns a short human line, or null if unavailable.
+async function fetchWeather(home: string, away: string, kickoffAt: number): Promise<string | null> {
+  const coords = await fetchVenueCoords(home, away);
+  if (!coords) return null;
+  try {
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}` +
+      `&hourly=temperature_2m,weather_code,wind_speed_10m&timezone=GMT&forecast_days=3`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const j = await res.json();
+    const times: string[] = j.hourly?.time ?? [];
+    const temps: number[] = j.hourly?.temperature_2m ?? [];
+    const codes: number[] = j.hourly?.weather_code ?? [];
+    const winds: number[] = j.hourly?.wind_speed_10m ?? [];
+    if (!times.length) return null;
+    // pick the hour nearest kickoff (Open-Meteo times are GMT, "YYYY-MM-DDTHH:00")
+    let best = 0;
+    let bestDiff = Infinity;
+    for (let i = 0; i < times.length; i++) {
+      const diff = Math.abs(Date.parse(times[i] + "Z") - kickoffAt);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        best = i;
+      }
+    }
+    if (bestDiff > 6 * 3600 * 1000) return null; // kickoff outside the forecast horizon
+    const temp = Math.round(temps[best]);
+    const cond = describeCode(codes[best] ?? 0);
+    const wind = winds[best] ?? 0;
+    const windNote = wind >= 30 ? ", blustery" : wind >= 18 ? ", breezy" : "";
+    return `${cond.charAt(0).toUpperCase() + cond.slice(1)}, ${temp}°C${windNote} at kickoff.`;
+  } catch {
+    return null;
+  }
+}
+
 // Teams + their last-5 form, computed from our own finished results (keyless, tournament-accurate).
 export const getFixtureContext = internalQuery({
   args: { fixtureId: v.id("fixtures") },
@@ -130,7 +230,7 @@ export const getFixtureContext = internalQuery({
           return gf > ga ? "W" : gf < ga ? "L" : "D";
         })
         .join("");
-    return { homeTeam: f.homeTeam, awayTeam: f.awayTeam, homeForm: form(f.homeTeam), awayForm: form(f.awayTeam) };
+    return { homeTeam: f.homeTeam, awayTeam: f.awayTeam, kickoffAt: f.kickoffAt, homeForm: form(f.homeTeam), awayForm: form(f.awayTeam) };
   },
 });
 
@@ -141,6 +241,7 @@ export const saveDossier = internalMutation({
     awayRank: v.optional(v.number()),
     homeForm: v.optional(v.string()),
     awayForm: v.optional(v.string()),
+    weather: v.optional(v.string()),
     homeStar: v.optional(v.object({ player: v.string(), sign: v.string(), url: v.optional(v.string()) })),
     awayStar: v.optional(v.object({ player: v.string(), sign: v.string(), url: v.optional(v.string()) })),
     news: v.array(v.object({ team: v.string(), headline: v.string(), source: v.optional(v.string()), url: v.optional(v.string()) })),
@@ -161,7 +262,11 @@ export const assembleForFixture = internalAction({
     // News sequentially (GNews free tier rate-limits concurrent calls); star lookups can be parallel.
     const homeNews = await fetchTeamNews(fx.homeTeam);
     const awayNews = await fetchTeamNews(fx.awayTeam);
-    const [homeStar, awayStar] = await Promise.all([fetchStar(fx.homeTeam), fetchStar(fx.awayTeam)]);
+    const [homeStar, awayStar, weather] = await Promise.all([
+      fetchStar(fx.homeTeam),
+      fetchStar(fx.awayTeam),
+      fetchWeather(fx.homeTeam, fx.awayTeam, fx.kickoffAt),
+    ]);
     const news = [
       ...homeNews.map((h) => ({ team: fx.homeTeam, headline: h.headline, source: "GNews", url: h.url })),
       ...awayNews.map((h) => ({ team: fx.awayTeam, headline: h.headline, source: "GNews", url: h.url })),
@@ -172,6 +277,7 @@ export const assembleForFixture = internalAction({
       awayRank: FIFA_RANK[fx.awayTeam],
       homeForm: fx.homeForm || undefined,
       awayForm: fx.awayForm || undefined,
+      weather: weather ?? undefined,
       homeStar: homeStar ?? undefined,
       awayStar: awayStar ?? undefined,
       news,

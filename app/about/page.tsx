@@ -23,6 +23,7 @@ const SOURCES = [
   { label: "FIFA world ranking", detail: "the tale of the tape", src: "FIFA", href: "https://inside.fifa.com/fifa-world-ranking/men" },
   { label: "Latest headlines", detail: "injuries, form, drama on the wire", src: "GNews", href: "https://gnews.io" },
   { label: "Talisman star signs", detail: "each side's danger man, born under…", src: "TheSportsDB", href: "https://www.thesportsdb.com" },
+  { label: "Matchday weather", detail: "the forecast at the host stadium for kickoff", src: "Open-Meteo", href: "https://open-meteo.com" },
   { label: "A cosmic angle", detail: "purely for the pundits to seize or mock", src: "For fun" },
 ];
 
