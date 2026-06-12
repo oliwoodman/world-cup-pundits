@@ -64,7 +64,7 @@ export const context = internalQuery({
         .query("identityCards")
         .withIndex("by_model", (q) => q.eq("modelId", m._id))
         .first();
-      const bankroll = m.startingBankroll - staked + returned;
+      const bankroll = Math.max(0, m.startingBankroll - staked + returned);
       rows.push({
         id: m._id,
         slug: m.modelSlug,
@@ -95,7 +95,7 @@ export const context = internalQuery({
       ? `${upcoming.homeTeam} v ${upcoming.awayTeam} (kickoff in ~${Math.max(1, Math.round((upcoming.kickoffAt - now) / 3_600_000))}h)`
       : null;
 
-    const recentDesc = await ctx.db.query("banter").order("desc").take(6);
+    const recentDesc = await ctx.db.query("banter").order("desc").take(10);
     const nameById = new Map(models.map((m) => [m._id, m.displayName]));
     const lastSpeakerId = recentDesc[0]?.modelId ?? null;
     const recentChat = [...recentDesc].reverse().map((r) => ({ name: nameById.get(r.modelId) ?? "?", content: r.content }));

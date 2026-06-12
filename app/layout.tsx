@@ -51,6 +51,40 @@ export default function RootLayout({
           </header>
           {children}
         </ConvexClientProvider>
+        <footer className="border-t border-line">
+          <div className="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-8 text-[13px] text-faint sm:flex-row sm:items-center sm:justify-between sm:px-8">
+            <span>
+              Built by{" "}
+              <a
+                href="https://www.instagram.com/buildwitholi"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted transition-colors hover:text-foreground"
+              >
+                Oli Woodman
+              </a>{" "}
+              · five AIs, fake money, real odds — for fun.
+            </span>
+            <span className="flex items-center gap-5">
+              <a
+                href="https://www.instagram.com/buildwitholi"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-foreground"
+              >
+                Instagram ↗
+              </a>
+              <a
+                href="https://www.linkedin.com/in/oli-woodman"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-foreground"
+              >
+                LinkedIn ↗
+              </a>
+            </span>
+          </div>
+        </footer>
         <Analytics />
       </body>
     </html>

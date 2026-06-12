@@ -93,7 +93,7 @@ async function moneyRace(db: DatabaseReader) {
         backingStake = b.stake;
       }
     }
-    rows.push({ id: m._id, name: m.displayName, bankroll: m.startingBankroll - staked + returned, open, backing, backingStake });
+    rows.push({ id: m._id, name: m.displayName, bankroll: Math.max(0, m.startingBankroll - staked + returned), open, backing, backingStake });
   }
   rows.sort((a, b) => b.bankroll - a.bankroll);
   return rows;
@@ -148,7 +148,11 @@ async function buildBriefing(db: DatabaseReader, modelId: Id<"models">): Promise
     (draw ? `${draw}\n` : "") +
     `THE MONEY RACE right now:\n${raceLines}\n` +
     `${myLine}\n` +
-    `RESULTS SO FAR: ${resultsText}`
+    `RESULTS SO FAR: ${resultsText}\n` +
+    `THE FLOOR: you can only ever stake money you actually have — never more than your current ` +
+    `bankroll. If you hit £0 you are BANKRUPT and OUT: no more bets for the rest of the tournament, ` +
+    `you just watch. So protect your downside; the aim is to finish with as much money as possible, ` +
+    `not to go down in flames.`
   );
 }
 
@@ -287,6 +291,8 @@ export const getTurnContext = internalQuery({
         : "Form — neither side has played a match yet.";
 
     const briefing = await buildBriefing(ctx.db, modelId);
+    const race = await moneyRace(ctx.db);
+    const myBankroll = race.find((r) => r.id === modelId)?.bankroll ?? 0;
     const dossierText = fixture.dossier ? dossierBlock(fixture.dossier, fixture.homeTeam, fixture.awayTeam) : "";
     const context =
       `FIXTURE: ${fixture.homeTeam} vs ${fixture.awayTeam} — World Cup 2026, ${fixture.stage}\n` +
@@ -314,6 +320,7 @@ export const getTurnContext = internalQuery({
       posture: card?.posture ?? "",
       mood: card?.mood ?? "neutral",
       riskDial: card?.riskDial ?? 50,
+      bankroll: myBankroll,
       transcript,
     };
   },
@@ -486,8 +493,14 @@ export const runLockTurn = internalAction({
       dedupeKey: `${debateId}:${modelId}`,
     });
 
+    // THE FLOOR: a pundit can only stake money it actually has. Once bankrupt (£0) it's out of the
+    // betting entirely — the prediction stands, but no money changes hands. Otherwise every bet is
+    // clamped to the bankroll left this turn, so a pundit can bust to exactly £0 but never go negative.
+    let remaining = inp.bankroll;
+    if (remaining <= 0) return; // bankrupt — out of the betting for good
+
     const ob = (parsed.outright_bet ?? {}) as Record<string, unknown>;
-    const obStake = num(ob.stake, 0);
+    const obStake = Math.min(Math.round(num(ob.stake, 0)), remaining);
     if (ob.team && String(ob.team).trim() && obStake > 0) {
       await ctx.runMutation(internal.engine.placeBet, {
         modelId,
@@ -498,11 +511,13 @@ export const runLockTurn = internalAction({
         odds: num(ob.odds, 0) || 5.0,
         dedupeKey: `${debateId}:${modelId}:outright_winner:${String(ob.team)}`,
       });
+      remaining -= obStake;
     }
 
     const mbs = Array.isArray(parsed.match_bets) ? (parsed.match_bets as Record<string, unknown>[]) : [];
     for (const b of mbs) {
-      const stake = num(b.stake, 0);
+      if (remaining <= 0) break; // out of money — no more bets this turn
+      const stake = Math.min(Math.round(num(b.stake, 0)), remaining);
       if (stake <= 0) continue;
       const market = String(b.market ?? "match_result");
       const selection = String(b.selection ?? "?");
@@ -516,6 +531,7 @@ export const runLockTurn = internalAction({
         odds: num(b.odds, 0) || 2.0,
         dedupeKey: `${debateId}:${modelId}:${market}:${selection}`,
       });
+      remaining -= stake;
     }
   },
 });

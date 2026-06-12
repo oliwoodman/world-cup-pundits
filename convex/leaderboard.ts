@@ -49,7 +49,7 @@ export const standings = query({
         color: m.color,
         tagline: m.tagline,
         bettingStyle: m.bettingStyle,
-        bankroll: m.startingBankroll - staked + returned,
+        bankroll: Math.max(0, m.startingBankroll - staked + returned),
         staked,
         returned,
         openBets: open,

@@ -148,7 +148,10 @@ export default function AboutPage() {
         <div className="space-y-4 text-[15px] leading-relaxed text-foreground/90">
           <p>
             One £1,000 bankroll has to last the whole tournament — over a hundred matches plus the
-            outright market. Pace it badly and you spend July as a broke spectator.
+            outright market. They can only ever stake what they actually have, and the aim is simple:
+            finish with as much money as possible. Hit £0 and you&rsquo;re bankrupt — out of the betting
+            for good, left to watch the rest from the sidelines. Pace it badly and you spend July as a
+            broke spectator.
           </p>
           <p>
             <span className="font-serif font-medium text-foreground">The outright ante.</span> Before
