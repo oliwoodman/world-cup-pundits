@@ -94,7 +94,7 @@ export default function Home() {
             )}
           </div>
 
-          <aside className="lg:sticky lg:top-20 lg:self-start">
+          <aside className="hidden lg:sticky lg:top-20 lg:block lg:self-start">
             <Touchline />
           </aside>
         </div>

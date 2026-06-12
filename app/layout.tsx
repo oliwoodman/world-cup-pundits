@@ -4,6 +4,7 @@ import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { ConvexClientProvider } from "./ConvexClientProvider";
+import { TouchlineDock } from "@/components/TouchlineDock";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -50,6 +51,7 @@ export default function RootLayout({
             </div>
           </header>
           {children}
+          <TouchlineDock />
         </ConvexClientProvider>
         <footer className="border-t border-line">
           <div className="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-8 text-[13px] text-faint sm:flex-row sm:items-center sm:justify-between sm:px-8">
