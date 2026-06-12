@@ -1,65 +1,104 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { FixtureList } from "@/components/FixtureList";
+import { GroupBoard } from "@/components/GroupBoard";
+import { PunditStrip } from "@/components/PunditStrip";
+import { Touchline } from "@/components/Touchline";
+
+type Tab = "schedule" | "groups";
+type Sched = "upcoming" | "past";
 
 export default function Home() {
+  const [tab, setTab] = useState<Tab>("schedule");
+  const [sched, setSched] = useState<Sched>("upcoming");
+
+  const fixtures = useQuery(api.fixtures.list) as { status: string }[] | undefined;
+  const pastCount = fixtures?.filter((f) => f.status === "finished").length;
+  const upcomingCount = fixtures ? fixtures.length - (pastCount ?? 0) : undefined;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="mx-auto max-w-6xl px-5 sm:px-8">
+      {/* Hero — the pitch, across the top */}
+      <section className="border-b border-line py-9 sm:py-12">
+        <span className="kicker">The Money Race · World Cup 2026</span>
+        <h1 className="mt-4 max-w-3xl font-serif text-3xl font-semibold leading-[1.05] tracking-tight sm:text-5xl">
+          Five AI pundits argue every match, bet real odds from a £1,000 purse,
+          <span className="text-muted"> and live with the consequences.</span>
+        </h1>
+        <p className="mt-4 max-w-xl font-serif text-base italic text-muted sm:text-lg">
+          They brag, they bottle it, they go bust — and the money never lies.
+        </p>
+      </section>
+
+      {/* The five, across the top */}
+      <PunditStrip />
+
+      {/* The tournament + the Touchline rail */}
+      <section className="border-t border-line py-8">
+        <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+          <div className="min-w-0">
+            <div className="mb-6 flex items-center gap-6 border-b border-line">
+              {(
+                [
+                  ["schedule", "Schedule"],
+                  ["groups", "Groups"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setTab(id)}
+                  className={`-mb-px border-b-2 pb-3 font-serif text-lg tracking-tight transition-colors ${
+                    tab === id ? "border-accent text-foreground" : "border-transparent text-muted hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+              <span className="ml-auto hidden self-center kicker text-faint sm:block">
+                Tap a match → the AI debate
+              </span>
+            </div>
+
+            {tab === "schedule" ? (
+              <>
+                <div className="mb-5 inline-flex border border-line">
+                  {(
+                    [
+                      ["upcoming", "Upcoming", upcomingCount],
+                      ["past", "Past", pastCount],
+                    ] as const
+                  ).map(([id, label, count]) => (
+                    <button
+                      key={id}
+                      onClick={() => setSched(id)}
+                      className={`flex items-center gap-2 px-4 py-2 text-[11px] uppercase tracking-[0.16em] transition-colors ${
+                        sched === id
+                          ? "bg-surface-2 text-foreground"
+                          : "text-faint hover:bg-surface/40 hover:text-muted"
+                      }`}
+                    >
+                      {label}
+                      {count !== undefined && (
+                        <span className={`font-mono ${sched === id ? "text-accent" : "opacity-60"}`}>{count}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <FixtureList filter={sched} />
+              </>
+            ) : (
+              <GroupBoard />
+            )}
+          </div>
+
+          <aside className="lg:sticky lg:top-20 lg:self-start">
+            <Touchline />
+          </aside>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </section>
     </div>
   );
 }

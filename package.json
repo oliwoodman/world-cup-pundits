@@ -9,6 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@convex-dev/workflow": "^0.4.4",
+    "@convex-dev/workpool": "^0.4.7",
+    "@vercel/analytics": "^2.0.1",
+    "convex": "^1.41.0",
+    "convex-helpers": "^0.1.119",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4"
