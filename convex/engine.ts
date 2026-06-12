@@ -99,6 +99,66 @@ async function moneyRace(db: DatabaseReader) {
   return rows;
 }
 
+// The full "state of play" every pundit gets — not just the money race, but WHAT each one has
+// actually done: bankroll, P&L, win/loss record, their Cup pick, their live open bets (selection +
+// stake + which match), and how their recent bets settled. The single grounded source so nobody
+// invents bets or results — fed into both the debates and the Touchline.
+export async function stateOfPlay(db: DatabaseReader): Promise<string> {
+  const models = await db.query("models").collect();
+  const fixtures = await db.query("fixtures").collect();
+  const fxById = new Map(fixtures.map((f) => [f._id, f]));
+  const matchLabel = (fixtureId: Id<"fixtures"> | undefined) => {
+    const f = fixtureId ? fxById.get(fixtureId) : undefined;
+    return f ? `${f.homeTeam} v ${f.awayTeam}` : "a match";
+  };
+
+  const rows = [];
+  for (const m of models) {
+    const bets = await db.query("bets").withIndex("by_model", (q) => q.eq("modelId", m._id)).collect();
+    let staked = 0;
+    let returned = 0;
+    let won = 0;
+    let lost = 0;
+    let cupSel: string | null = null;
+    let cupStake = 0;
+    const open: string[] = [];
+    const settled: { at: number; text: string }[] = [];
+    for (const b of bets) {
+      staked += b.stake;
+      if (b.status === "won") {
+        returned += b.payout ?? 0;
+        won++;
+      } else if (b.status === "lost") {
+        lost++;
+      } else if (b.status === "void") {
+        returned += b.payout ?? 0;
+      }
+      if (b.kind === "outright" && b.status !== "lost" && b.stake > cupStake) {
+        cupSel = b.selection;
+        cupStake = b.stake;
+      }
+      if (b.kind === "match") {
+        if (b.status === "open") open.push(`${gbp(b.stake)} on ${b.selection} (${matchLabel(b.fixtureId)})`);
+        else if (b.status === "won") settled.push({ at: b.placedAt, text: `won ${gbp(b.payout ?? 0)} on ${b.selection} (${matchLabel(b.fixtureId)})` });
+        else if (b.status === "lost") settled.push({ at: b.placedAt, text: `lost ${gbp(b.stake)} on ${b.selection} (${matchLabel(b.fixtureId)})` });
+      }
+    }
+    const bankroll = Math.max(0, m.startingBankroll - staked + returned);
+    settled.sort((a, b) => b.at - a.at);
+    rows.push({ id: m._id, name: m.displayName, bankroll, pl: bankroll - 1000, won, lost, cupSel, cupStake, open, settled: settled.slice(0, 3).map((s) => s.text) });
+  }
+  rows.sort((a, b) => b.bankroll - a.bankroll);
+
+  return rows
+    .map((r, i) => {
+      const cup = r.cupSel ? `backs ${r.cupSel} for the Cup (${gbp(r.cupStake)})` : "no Cup bet";
+      const openTxt = r.open.length ? ` Open match bets: ${r.open.join("; ")}.` : " No open match bets.";
+      const settledTxt = r.settled.length ? ` Recently: ${r.settled.join("; ")}.` : "";
+      return `  ${i + 1}. ${r.name} — ${gbp(r.bankroll)} (${r.pl >= 0 ? "+" : ""}${Math.round(r.pl)}), ${r.won}W-${r.lost}L; ${cup}.${openTxt}${settledTxt}`;
+    })
+    .join("\n");
+}
+
 // One team's tournament record so far, from finished results.
 async function teamRecord(db: DatabaseReader, team: string) {
   const fixtures = await db.query("fixtures").withIndex("by_kickoff").collect();
@@ -121,9 +181,7 @@ async function buildBriefing(db: DatabaseReader, modelId: Id<"models">): Promise
   const race = await moneyRace(db);
   const myRank = race.findIndex((r) => r.id === modelId) + 1;
   const me = race.find((r) => r.id === modelId);
-  const raceLines = race
-    .map((r, i) => `  ${i + 1}. ${r.name} ${gbp(r.bankroll)}${r.backing ? ` — backs ${r.backing} for the Cup (${gbp(r.backingStake)})` : " — no Cup bet"}`)
-    .join("\n");
+  const ledger = await stateOfPlay(db);
 
   const fixtures = await db.query("fixtures").withIndex("by_kickoff").collect();
   const results = fixtures
@@ -146,7 +204,8 @@ async function buildBriefing(db: DatabaseReader, modelId: Id<"models">): Promise
     `is to finish with the MOST money of the five pundits. Pace it: blow the lot early and you spend the ` +
     `tournament as a broke spectator; sit on it and you lose to whoever compounds. Going bust ends you.\n` +
     (draw ? `${draw}\n` : "") +
-    `THE MONEY RACE right now:\n${raceLines}\n` +
+    `THE STATE OF PLAY — every pundit's money, record and ACTUAL bets (these are the real facts; ` +
+    `do not invent or misquote them):\n${ledger}\n` +
     `${myLine}\n` +
     `RESULTS SO FAR: ${resultsText}\n` +
     `THE FLOOR: you can only ever stake money you actually have — never more than your current ` +

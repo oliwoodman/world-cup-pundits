@@ -23,7 +23,8 @@ crons.cron("sync odds (evening)", "0 18 * * *", internal.odds.syncOdds, { withOu
 
 // Gated score polling: the action early-returns for free unless a fixture has plausibly
 // finished but isn't settled, so this only spends 2 credits around full-time of real games.
-crons.interval("poll scores", { minutes: 30 }, internal.scores.syncScores, {});
+// Every 15 min keeps the settlement lag short while staying free outside those windows.
+crons.interval("poll scores", { minutes: 15 }, internal.scores.syncScores, {});
 
 // The Touchline: a constant ambient group chat — one pundit chimes in each minute (models are free).
 crons.interval("touchline banter", { minutes: 1 }, internal.banter.tick, {});

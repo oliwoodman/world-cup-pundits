@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { action, internalAction, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { callModel } from "./engine";
+import { callModel, stateOfPlay } from "./engine";
 import { tournamentGroundingText } from "./tournament";
 
 // The "Touchline" — an ambient group chat that runs between debates. Each tick, one pundit drops a
@@ -101,8 +101,9 @@ export const context = internalQuery({
     const recentChat = [...recentDesc].reverse().map((r) => ({ name: nameById.get(r.modelId) ?? "?", content: r.content }));
 
     const draw = tournamentGroundingText(fixtures.filter((f) => f.externalId));
+    const stateText = await stateOfPlay(ctx.db);
 
-    return { models: ranked, results, nextMatch, recent: recentChat, lastSpeakerId, draw };
+    return { models: ranked, results, nextMatch, recent: recentChat, lastSpeakerId, draw, stateText };
   },
 });
 
@@ -117,16 +118,6 @@ export const tick = internalAction({
     // vary the speaker by index without Math.random in a deterministic-sensitive path (this is an action, so it's fine)
     const speaker = candidates[Math.floor(Math.random() * candidates.length)];
 
-    // The REAL ledger — what each pundit has actually done — so nobody invents bets or results.
-    const positions = c.models
-      .map((m) => {
-        const pick = m.backing
-          ? `backs ${m.backing} to win the Cup (£${Math.round(m.backingStake)})`
-          : "no tournament-winner bet";
-        const openTxt = m.openMatch ? `, ${m.openMatch} open match bet${m.openMatch > 1 ? "s" : ""}` : "";
-        return `${m.rank}. ${m.name} — £${Math.round(m.bankroll)} (${m.pl >= 0 ? "+" : ""}${Math.round(m.pl)}), ${pick}${openTxt}`;
-      })
-      .join("\n");
     const me = c.models.find((m) => m.id === speaker.id)!;
     const myPick = me.backing ? `you backed ${me.backing} to win the Cup for £${Math.round(me.backingStake)}` : "you have NOT placed a tournament-winner bet";
     const chat = c.recent.length ? c.recent.map((r) => `${r.name}: ${r.content}`).join("\n") : "(the chat is quiet so far)";
@@ -141,7 +132,7 @@ export const tick = internalAction({
     const user =
       `THE REAL STATE — these are facts, do not contradict or invent beyond them:\n\n` +
       (c.draw ? `${c.draw}\n\n` : "") +
-      `THE MONEY RACE & everyone's bets:\n${positions}\n\n` +
+      `THE STATE OF PLAY — everyone's money, record and ACTUAL bets:\n${c.stateText}\n\n` +
       `YOU are ${speaker.name}: £${Math.round(me.bankroll)} (rank ${me.rank}/5); ${myPick}.\n` +
       `Results so far: ${c.results}\n` +
       (c.nextMatch ? `Next match up: ${c.nextMatch}\n` : "No match kicking off imminently.\n") +
