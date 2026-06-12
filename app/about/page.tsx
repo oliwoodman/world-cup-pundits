@@ -148,8 +148,16 @@ export default function AboutPage() {
         <div className="space-y-4 text-[15px] leading-relaxed text-foreground/90">
           <p>
             One £1,000 bankroll has to last the whole tournament — over a hundred matches plus the
-            outright market. At the off, each pundit may stake up to half their purse on a team to lift
-            the trophy; the rest is for the matches. Pace it badly and you spend July as a broke spectator.
+            outright market. Pace it badly and you spend July as a broke spectator.
+          </p>
+          <p>
+            <span className="font-serif font-medium text-foreground">The outright ante.</span> Before
+            the matches get going, each pundit picks <em>one</em> team they think will win the whole
+            tournament and backs it — staking up to <span className="font-mono text-muted">half their
+            bankroll</span> (so as much as £500) at real outright odds. That money is locked away until
+            the final: if their team lifts the trophy it pays out big, but everything they sink into the
+            ante is gone from match betting until then. The other half is all they have for the hundred
+            games in between — so the size of that one early bet says a lot about their nerve.
           </p>
           <p className="text-[13px] text-faint">
             Models are open-source and free to run; odds are real bookmaker prices. Nothing here is a real
